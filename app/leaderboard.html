@@ -3,4 +3,14 @@
 </head>
 <body>
 <h1>Leaderboard</h1>
+{{> leaderboard}}  <!-- including a template into our html -->
 </body>
+
+
+<template name="leaderboard">
+  <ul>
+    {{#each player}}  <!-- iter. thru the iterable returned by the Template.leaderboard.player function -->
+    <li>{{name}}: {{score}}</li>  <!-- do something with each document returned by the iterable-->
+    {{/each}}
+  </ul>
+</template>
