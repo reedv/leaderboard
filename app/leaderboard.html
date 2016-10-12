@@ -7,10 +7,32 @@
 </body>
 
 
+<!--- Templates' logic --->
+
 <template name="leaderboard">
+  {{> addPlayerForm}}
+  <button class="remove"> Remove Player </button>
   <ul>
-    {{#each player}}  <!-- iter. thru the iterable returned by the Template.leaderboard.player function -->
-    <li>{{name}}: {{score}}</li>  <!-- do something with each document returned by the iterable-->
+    <!-- Check that a valid player has already been selected/clicked -->
+    {{#if selectedPlayer}}
+    <!-- display the name value of the doc returned by selectedPlayer template helper -->
+    <li>Selected Player: {{selectedPlayer.name}}</li>
+    <li>
+      <button class="increment">Give 5 Points</button>
+      <button class="decrement">Take 5 Points</button>
+    </li>
+    {{/if}}
+    <!-- iter. thru the iterable returned by the Template.leaderboard.player function -->
+    {{#each player}}
+    <!-- do something with each document returned by the iterable-->
+    <li class="player {{selectedClass}}">{{name}}: {{score}}</li>
     {{/each}}
   </ul>
+</template>
+
+<template name="addPlayerForm">
+  <form>
+    <input type="text" name="playerName">
+    <input type="submit" value="Add Player">
+  </form>
 </template>
