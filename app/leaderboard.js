@@ -9,14 +9,19 @@ PlayersList = new Mongo.Collection('players');
 if(Meteor.isClient){
   console.log("Hello client");
 
+  // need to explicitly subcribe to a collection (when 'autopublish' pkg removed)
+  Meteor.subscribe('thePlayers');
+
   // This helpers keyword is a special keyword that allows us to define multiple
   //   helper functions inside a single block of code.
   Template.leaderboard.helpers({
     'player': function(){
+      let currentUserId = Meteor.userId();
       // SomeCollection.find({selector}, {options})
       //   @param {MongoSelector} [selector] A query describing the documents to find
       //   @param {Object} [options]
-      return PlayersList.find({}, {sort: {score: -1, name: 1}});  //find all docs and sort by descending scores and normal alpha
+      return PlayersList.find({createdBy: currentUserId},  // find docs createdBy currentUser..
+                              {sort: {score: -1, name: 1}});  // ..and sort by descending scores and normal alpha
     },
 
     // because the “selectedClass” function is being executed from inside the each block,
@@ -89,6 +94,9 @@ if(Meteor.isClient){
       // prevent default browser behavior for this event (in this case, stop from reloading)
       event.preventDefault();
 
+      // function provided by the login provider package, allows to retrieve unique ID of currently logged-in user
+      let currentUserId = Meteor.userId();
+
       // references the event to grab whatever HTML element has its name attribute
       //   defined as “playerName”
       let playerNameVal = event.target.playerName.value;  // need to excplicitly retrive value of the form field
@@ -96,7 +104,8 @@ if(Meteor.isClient){
       // add this new player to the PlayerList collection
       PlayersList.insert({
         name: playerNameVal,
-        score: 0
+        score: 0,
+        createdBy: currentUserId
       });
 
       // clear the form
@@ -110,5 +119,12 @@ if(Meteor.isClient){
 if(Meteor.isServer){
   console.log("Hello server");
 
+  Meteor.publish('thePlayers', function() {
+    // called on the server each time a client subscribes to the named record set
+
+    // only return docs. created by the current client user subscribing
+    let currentPlayerId = this.userId;  // can't use Meteor.userId here
+    return PlayersList.find({createdBy: currentPlayerId});
+  });
 }
 
