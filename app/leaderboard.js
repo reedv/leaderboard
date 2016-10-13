@@ -50,7 +50,6 @@ if(Meteor.isClient){
     // w/out the event selector (here, class '.player'), the this event would be triggered if
     //   we trigger the event (in this case 'click') from anywhere in the leaderboard template
     'click .player' : function() {
-      console.log('click an .player element');
       //  we have a reference to this, and as is always the case in JavaScript,
       //   the value of this depends on the context. In this particular case,
       //   this refers to the Mongo document of the player that has just been clicked.
@@ -59,30 +58,33 @@ if(Meteor.isClient){
       // set a session name and value. Note: There can only be one value stored inside
       //   a single session, so each time a new value is stored, the previous value is overwritten.
       Session.set('selectedPlayer', playerId);
-      let selectedPlayer = Session.get('selectedPlayer');
-      console.log(selectedPlayer);
+
+      // let selectedPlayer = Session.get('selectedPlayer');
+      // console.log(selectedPlayer);
     },
 
     'click .increment': function(){
       let selectedPlayer = Session.get('selectedPlayer');
+      const amount = 5;
+      const  currScore = PlayersList.findOne(selectedPlayer).score;
+      const MAX = 1000000000;
 
-      // SomeCollection.update(selector, modifier)
-      //   selector - Specifies which documents to modify
-      //   modifier - Specifies how to modify the documents
-      PlayersList.update({_id: selectedPlayer}, {$inc: {score: 5}});
-      // NOTE: W/out using ops. like $set{: {..}} of inc${: {..}} the update function works
-      //   by deleting the original document that’s being updated and then creating
-      //   an entirely new document with the data that we specify (except for _id).
+      if(!(currScore+amount > MAX)) {
+        Meteor.call('updateScore', selectedPlayer, currScore, amount);
+      }
     },
 
     'click .decrement': function() {
       let selectedPlayer = Session.get('selectedPlayer');
-      PlayersList.update({_id: selectedPlayer}, {$inc: {score: -5}})
+      const amount = -5;
+      const currScore = PlayersList.findOne(selectedPlayer).score;
+
+      Meteor.call('updateScore', selectedPlayer, currScore, amount);
     },
 
     'click .remove': function() {
       let selectedPlayer = Session.get('selectedPlayer');
-      PlayersList.remove({_id: selectedPlayer});
+      Meteor.call('removePlayer', selectedPlayer);
     }
   });
 
@@ -94,19 +96,14 @@ if(Meteor.isClient){
       // prevent default browser behavior for this event (in this case, stop from reloading)
       event.preventDefault();
 
-      // function provided by the login provider package, allows to retrieve unique ID of currently logged-in user
-      let currentUserId = Meteor.userId();
-
       // references the event to grab whatever HTML element has its name attribute
       //   defined as “playerName”
       let playerNameVal = event.target.playerName.value;  // need to excplicitly retrive value of the form field
 
-      // add this new player to the PlayerList collection
-      PlayersList.insert({
-        name: playerNameVal,
-        score: 0,
-        createdBy: currentUserId
-      });
+      // Note on optimistic ui:  when the “createPlayer” method is executed on the client,
+      //   Meteor “guesses” what the method is trying to do on the server and instantly reflects
+      //   those changes from inside the browser.
+      Meteor.call('createPlayer', playerNameVal);
 
       // clear the form
       event.target.playerName.value = "";
@@ -128,3 +125,56 @@ if(Meteor.isServer){
   });
 }
 
+
+// methods are simply blocks of code that can be triggered from elsewhere in an application
+Meteor.methods({
+  'createPlayer': function(playerNameVal) {
+    // get this funciton by adding the 'check' pkg
+    check(playerNameVal, String);
+
+    // function provided by the login provider package, allows to retrieve unique ID of currently logged-in user
+    let currentUserId = Meteor.userId();
+
+    // check that user accessing this method is logged in
+    if(currentUserId && playerNameVal != "" && playerNameVal != "''") {
+      // add this new player to the PlayerList collection
+      PlayersList.insert({
+        name: playerNameVal,
+        score: 0,
+        createdBy: currentUserId
+      });
+    }
+  },
+
+  'removePlayer': function(selectedPlayer) {
+    check(selectedPlayer, String);
+    let currentUserId = Meteor.userId();
+    if(currentUserId) {
+      // should only be able to remove docs. associated with the currentUser
+      PlayersList.remove({ _id: selectedPlayer, createdBy: currentUserId });
+    }
+  },
+
+  'updateScore': function(selectedPlayer, currScore, amount) {
+    check(selectedPlayer, String);
+    check(amount, Number);
+
+    const MAX = 1000000000;
+    let currentUserId = Meteor.userId();
+    let change = currScore + amount;
+    if(currentUserId &&
+        (0 < change) && (change > MAX)) {
+      // SomeCollection.update(selector, modifier)
+      //   selector - Specifies which documents to modify
+      //   modifier - Specifies how to modify the documents
+      PlayersList.update({ _id: selectedPlayer, createdBy: currentUserId },
+                         { $inc: { score: amount } });
+    }
+
+    // NOTE: W/out using ops. like $set{: {..}} of inc${: {..}} the update function works
+    //   by deleting the original document that’s being updated and then creating
+    //   an entirely new document with the data that we specify (except for _id).
+  },
+
+
+});
